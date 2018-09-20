@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hello Bulma!</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.1/css/bulma.min.css">
+    <script defer src="https://use.fontawesome.com/releases/v5.1.0/js/all.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  </head>
+  <body>
+        <section class="section">
+            <div class="container">
+                <h1 class="title">Mini trivia</h1>
+                
+                <div class="field has-addons">
+                    <div class="control">
+                        <input class="input" type="text" placeholder="Nickname" id="Nickname">
+                    </div>
+                    <div class="control" id="btnNickname">
+                        <a class="button is-info" onclick="showOnlyCategory()">
+                        Start
+                        </a>
+                    </div>
+                </div>
+            
+                <div id="divCategory">
+                <div class="field has-addons">
+                    <div class="control">
+                        <div class="select">
+                        <select id="category">
+                        </select>
+                        </div>
+                    </div>
+                    <div class="control" id="btnCategory">
+                        <a class="button is-info" onclick="showOnlyTrivia()">
+                        Choose category
+                        </a>
+                    </div>
+                </div>
+                </div>
+                <div id="divTrivia">
+                    <div class="field">
+                        <div class="control" id="questions">
+                            <label class="radio">
+                            <input type="radio" name="question" id="question1" value="Yes">
+                            Yes
+                            </label><br/>
+                            <label class="radio">
+                            <input type="radio" name="question" id="question2" value="No">
+                            No
+                            </label>
+                        </div>
+                        <div class="control" id="btnTrivia">
+                            <a class="button is-info" onclick="checkAnswer()">
+                            Answer
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+  </body>
+
+  <script>
+  
+    var ix = 0;
+    var results = Array();
+    showOnlyNickname();
+
+    function showOnlyNickname(){
+        document.getElementById("Nickname").disabled = false;
+        document.getElementById("btnNickname").disabled = false;
+        document.getElementById("divCategory").style.display = "none";
+        document.getElementById("divTrivia").style.display = "none";
+        
+    }
+    function showOnlyCategory(){
+        document.getElementById("Nickname").disabled = true;
+        document.getElementById("btnNickname").style.display = "none";
+        document.getElementById("divCategory").style.display = "block";
+        document.getElementById("btnCategory").style.display = "none";
+        document.getElementById("divTrivia").style.display = "none";
+        getCategories()
+    }
+
+    function showOnlyTrivia(){
+        document.getElementById("Nickname").disabled = true;
+        document.getElementById("btnNickname").style.display = "none";
+        document.getElementById("category").disabled = true;
+        document.getElementById("btnCategory").style.display = "none";
+        document.getElementById("divTrivia").style.display = "block";
+        getQuestions();
+    }
+
+
+    function checkAnswer(){
+        document.getElementsByName("question").forEach(r => {
+            if(r.checked){
+                showResult(r.value);
+            }
+        });
+    }
+
+    function getCategories(){
+        axios.get('https://opentdb.com/api_category.php')
+        .then(function (response) {
+            categories = response.data.trivia_categories;
+            categories.forEach(c => {
+                var option = document.createElement("option");
+                option.value = c.id;
+                option.text = c.name;
+                document.getElementById("category").add(option);
+            });
+            document.getElementById("btnCategory").style.display = "block";
+        })
+        .catch(function (error) {
+            // handle error
+            alert(error);
+        });
+    }
+
+    function getQuestions(){
+        ix = 0;
+        axios.get('https://opentdb.com/api.php?amount=10&category='+document.getElementById("category").value+'&difficulty=easy')
+        .then(function(response){
+            results = response.data.results;
+            showNextQuestion();
+        })
+        .catch(function (error) {
+            // handle error
+            alert(error);
+        });
+    }
+
+    function showNextQuestion(){
+        if(results.length==0){
+            alert("Sorry, the server would not give any data!");
+            return;
+        }
+
+        if(results.length<ix+1){
+            if(confirm("Do you want me to get new questions now?")){
+                getQuestions();
+            }
+            return;
+        }
+
+        while (document.getElementById("questions").firstChild) {
+            document.getElementById("questions").removeChild(document.getElementById("questions").firstChild);
+        }
+
+        addQuestion(results[ix].question);
+        
+        showMultipleChoice(results[ix]);
+
+        ix++;
+    }
+
+    function showMultipleChoice(question){
+        var max = question.incorrect_answers.length;
+        correctElementPos = Math.floor(Math.random()*(max+1))
+        for (i=0;i<correctElementPos;i++){
+            addElement(question.incorrect_answers[i],false)
+        }
+        addElement(question.correct_answer,true)
+        for (i=correctElementPos;i<max;i++){
+            addElement(question.incorrect_answers[i], false)
+            
+        }
+
+        result = document.createElement("div");
+        result.setAttribute("id","answer");
+
+        document.getElementById("questions").appendChild(result);
+    }
+
+    function addQuestion(questionText){
+        var br = document.createElement("br");
+        var title = document.createElement("div");
+        var txt = document.createTextNode(htmlDecode(questionText).bold());
+        
+        title.innerHTML = htmlDecode(questionText).bold();
+        document.getElementById("questions").appendChild(title);
+        document.getElementById("questions").appendChild(br);
+    }
+
+    function addElement(qText, value){
+        var question = document.createElement("label");
+        question.classList.add("radio");
+
+        var opt = document.createElement("input");
+        opt.name="question";
+        opt.value= value
+        opt.type="radio";
+            
+        question.appendChild(opt);
+
+        var txt = document.createTextNode(htmlDecode(htmlDecode(qText)));
+
+        question.appendChild(txt);
+
+        var br = document.createElement("br")
+
+        document.getElementById("questions").appendChild(question);
+        document.getElementById("questions").appendChild(br);
+        
+    }
+
+    function htmlDecode(input){
+        var e = document.createElement('div');
+        e.innerHTML = input;
+        // handle case of empty input
+        return e.childNodes.length === 0 ? "" : e.childNodes[0].nodeValue;
+    }
+
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function showResult(result) {
+        document.getElementById("answer").innerHTML = "Is correct: "+result;
+        document.getElementById("btnTrivia").style.display = "none";
+        await sleep(2000);
+        showNextQuestion();
+        document.getElementById("btnTrivia").style.display = "block";
+    }
+
+  </script>
+</html>
