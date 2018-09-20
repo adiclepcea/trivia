@@ -1,6 +1,6 @@
 .PHONY: build test test-integration
 
-build:
+build: test
 	go build -o trivia .
 
 test:
