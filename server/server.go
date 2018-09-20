@@ -2,15 +2,21 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 const categoriesURL = "https://opentdb.com/api_category.php"
+
+var mut = sync.Mutex{}
+
+var responses map[string][]QuestionResponse
 
 //QuestionAnswers is a question and the corresponding answers
 //both correct and incorrect
@@ -39,11 +45,13 @@ type CategoriesResponse struct {
 type QuestionResponse struct {
 	Question string `json:"question"`
 	User     string `json:"user"`
-	Correct  bool   `json:"correct"`
+	Correct  string `json:"correct"`
 }
 
 //Serve will start a new server for trivia
 func Serve(port string) error {
+
+	responses = map[string][]QuestionResponse{}
 
 	cats, err := populateCategories(categoriesURL)
 	if err != nil {
@@ -52,7 +60,10 @@ func Serve(port string) error {
 
 	r := gin.Default()
 	r.GET("/categories", categories(cats))
+	r.POST("/report", report)
+	r.GET("/summary", summary)
 	r.Static("/trivia", "./html")
+
 	return r.Run(port)
 }
 
@@ -86,4 +97,62 @@ func categories(cats []Category) func(c *gin.Context) {
 			Categories: cats,
 		})
 	}
+}
+
+func report(c *gin.Context) {
+	r := QuestionResponse{}
+
+	err := c.BindJSON(&r)
+
+	if err != nil {
+		log.Printf("Error reading report: %s\n", err.Error())
+		c.AbortWithStatus(http.StatusBadRequest)
+	}
+
+	mut.Lock()
+	defer mut.Unlock()
+
+	ur, ok := responses[r.User]
+
+	if !ok {
+		ur = []QuestionResponse{r}
+	}
+
+	ur = append(ur, r)
+
+	responses[r.User] = ur
+
+	c.JSON(200, gin.H{"status": "OK"})
+}
+
+func summary(c *gin.Context) {
+	user := c.Query("user")
+
+	if user == "" {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	mut.Lock()
+	ur, ok := responses[user]
+	responses[user] = []QuestionResponse{}
+	mut.Unlock()
+
+	if !ok {
+		log.Println("Unknown user: ", user)
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+
+	correct := 0
+	total := 0
+	for _, u := range ur {
+		total = total + 1
+		if u.Correct == "true" {
+			correct = correct + 1
+		}
+	}
+
+	c.JSON(200, gin.H{"report": fmt.Sprintf("%d/ %d", correct, total)})
+
 }

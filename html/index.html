@@ -42,14 +42,7 @@
                 <div id="divTrivia">
                     <div class="field">
                         <div class="control" id="questions">
-                            <label class="radio">
-                            <input type="radio" name="question" id="question1" value="Yes">
-                            Yes
-                            </label><br/>
-                            <label class="radio">
-                            <input type="radio" name="question" id="question2" value="No">
-                            No
-                            </label>
+                            
                         </div>
                         <div class="control" id="btnTrivia">
                             <a class="button is-info" onclick="checkAnswer()">
@@ -66,6 +59,7 @@
   
     var ix = 0;
     var results = Array();
+    var questionNow = "";
     showOnlyNickname();
 
     function showOnlyNickname(){
@@ -76,10 +70,15 @@
         
     }
     function showOnlyCategory(){
+        if(!alphanumeric(document.getElementById("Nickname").value)){
+            alert("Please use only alphanum!");
+            return;
+        }
         document.getElementById("Nickname").disabled = true;
         document.getElementById("btnNickname").style.display = "none";
         document.getElementById("divCategory").style.display = "block";
         document.getElementById("btnCategory").style.display = "none";
+        document.getElementById("category").disabled = false;
         document.getElementById("divTrivia").style.display = "none";
         getCategories()
     }
@@ -103,7 +102,7 @@
     }
 
     function getCategories(){
-        axios.get('https://opentdb.com/api_category.php')
+        axios.get('/categories')
         .then(function (response) {
             categories = response.data.trivia_categories;
             categories.forEach(c => {
@@ -140,9 +139,7 @@
         }
 
         if(results.length<ix+1){
-            if(confirm("Do you want me to get new questions now?")){
-                getQuestions();
-            }
+            showSummary();
             return;
         }
 
@@ -176,6 +173,7 @@
     }
 
     function addQuestion(questionText){
+        questionNow = questionText;
         var br = document.createElement("br");
         var title = document.createElement("div");
         var txt = document.createTextNode(htmlDecode(questionText).bold());
@@ -218,12 +216,41 @@
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
+    function showSummary(){
+        axios.get("/summary?user="+document.getElementById("Nickname").value)
+        .then(function(response){
+            console.log(response)
+            alert(response.data.report);
+            showOnlyCategory();
+        })
+        .catch(function (error) {
+            alert(error);
+        });
+    }
+
     async function showResult(result) {
+        axios.post('/report',{
+            question: btoa(questionNow),
+            user: document.getElementById("Nickname").value,
+            correct: result
+        })
+        .then(function (response) {
+            
+        })
+        .catch(function (error) {
+            alert(error);
+        });
+
         document.getElementById("answer").innerHTML = "Is correct: "+result;
         document.getElementById("btnTrivia").style.display = "none";
         await sleep(2000);
         showNextQuestion();
         document.getElementById("btnTrivia").style.display = "block";
+    }
+
+    function alphanumeric(inputtxt) { 
+        var letters = /^[0-9a-zA-Z]+$/;
+        return letters.test(inputtxt);
     }
 
   </script>
