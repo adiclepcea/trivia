@@ -51,6 +51,9 @@
                         </div>
                     </div>
                 </div>
+                <div id="divStats">
+                    
+                </div>
             </div>
         </section>
   </body>
@@ -60,7 +63,42 @@
     var ix = 0;
     var results = Array();
     var questionNow = "";
+    var sock = null;
+    var wsuri = "ws://vps01.clepcea.ro:9000/ws";
     showOnlyNickname();
+
+    window.onload = function() {
+
+        console.log("onload");
+
+        sock = new WebSocket(wsuri);
+
+        sock.onopen = function() {
+            console.log("connected to " + wsuri);
+        }
+
+        sock.onclose = function(e) {
+            console.log("connection closed (" + e.code + ")");
+        }
+
+        sock.onmessage = function(e) {
+            console.log(e.data);
+            var d = JSON.parse(e.data);
+            s = "<table><tr><td>user</td><td>Correct</td><td>Incorrect</td></tr>";
+            d.forEach(function(data){
+                console.log(data)
+                s = s + "<tr><td style='text-align:center'>"+data.User+"</td><td style='text-align:center'>"+data.OK+"</td><td style='text-align:center'>"+data.NOK+"</td></tr>";
+            })
+            s = s + "</table>";
+            divStats.innerHTML = s;
+            console.log("message received: " + s);
+        }
+    };
+
+    function send() {
+        var msg = document.getElementById('message').value;
+        sock.send(msg);
+    };
 
     function showOnlyNickname(){
         document.getElementById("Nickname").disabled = false;

@@ -6,17 +6,36 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gopkg.in/olahol/melody.v1"
 )
+
+type userAnswer struct {
+	User    string
+	Correct bool
+}
+
+type stats struct {
+	User string
+	OK   int
+	NOK  int
+}
 
 const categoriesURL = "https://opentdb.com/api_category.php"
 
 var mut = sync.Mutex{}
 
 var responses map[string][]QuestionResponse
+
+var liveStats = map[string]stats{}
+
+var ch = make(chan string, 10)
+var done = make(chan struct{}, 1)
+var chLive = make(chan userAnswer, 10)
 
 //QuestionAnswers is a question and the corresponding answers
 //both correct and incorrect
@@ -48,6 +67,8 @@ type QuestionResponse struct {
 	Correct  string `json:"correct"`
 }
 
+var m *melody.Melody
+
 //Serve will start a new server for trivia
 func Serve(port string) error {
 
@@ -59,12 +80,34 @@ func Serve(port string) error {
 	}
 
 	r := gin.Default()
+	m = melody.New()
+
 	r.GET("/categories", categories(cats))
 	r.POST("/report", report)
 	r.GET("/summary", summary)
 	r.Static("/trivia", "./html")
+	r.GET("/ws", func(c *gin.Context) {
+		m.HandleRequest(c.Writer, c.Request)
+	})
+
+	go liveStatistics()
+	go wsHandler()
 
 	return r.Run(port)
+}
+
+func wsHandler() {
+	for {
+		select {
+		case msg := <-ch:
+			if err := m.Broadcast([]byte(msg)); err != nil {
+				log.Println("Can't send")
+			}
+		case <-done:
+			log.Println("Finished")
+			break
+		}
+	}
 }
 
 func populateCategories(url string) ([]Category, error) {
@@ -122,6 +165,11 @@ func report(c *gin.Context) {
 
 	responses[r.User] = ur
 
+	chLive <- userAnswer{
+		User:    r.User,
+		Correct: r.Correct == "true",
+	}
+
 	c.JSON(200, gin.H{"status": "OK"})
 }
 
@@ -155,4 +203,43 @@ func summary(c *gin.Context) {
 
 	c.JSON(200, gin.H{"report": fmt.Sprintf("%d/ %d", correct, total)})
 
+}
+
+func liveStatistics() {
+	for {
+		ua := <-chLive
+		ls, ok := liveStats[ua.User]
+		if !ok {
+			ls = stats{OK: 0, NOK: 0, User: ua.User}
+		}
+		if ua.Correct {
+			ls.OK = ls.OK + 1
+		} else {
+			ls.NOK = ls.NOK + 1
+		}
+
+		liveStats[ua.User] = ls
+
+		liveUserStats := []stats{}
+
+		for _, s := range liveStats {
+			liveUserStats = append(liveUserStats, s)
+		}
+		sort.Slice(liveUserStats, func(i, j int) bool {
+			if liveUserStats[i].OK == liveUserStats[j].OK {
+				return liveUserStats[i].NOK < liveUserStats[j].NOK
+			}
+			return liveUserStats[i].OK > liveUserStats[j].OK
+		})
+
+		data, err := json.Marshal(liveUserStats)
+
+		if err != nil {
+			log.Printf("Cannot show stats: %s", err.Error())
+			return
+		}
+
+		log.Println(string(data))
+		ch <- string(data)
+	}
 }

@@ -31,6 +31,14 @@
   version = "v1.2.0"
 
 [[projects]]
+  digest = "1:7b5c6e2eeaa9ae5907c391a91c132abfd5c9e8a784a341b5625e750c67e6825d"
+  name = "github.com/gorilla/websocket"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "66b9c49e59c6c48f0ffce28c2d8b8a5678502c6d"
+  version = "v1.4.0"
+
+[[projects]]
   digest = "1:3e551bbb3a7c0ab2a2bf4660e7fcad16db089fdcfbb44b0199e62838038623ea"
   name = "github.com/json-iterator/go"
   packages = ["."]
@@ -87,6 +95,14 @@
   version = "v8.18.2"
 
 [[projects]]
+  digest = "1:0a7a9cf66246acda7703a89c6ccbd68aefdba2eea775e7368c92879c24f1c606"
+  name = "gopkg.in/olahol/melody.v1"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "d521390733761fe1db13de575c253afd5c743085"
+  version = "v1"
+
+[[projects]]
   digest = "1:342378ac4dcb378a5448dd723f0784ae519383532f5e70ade24132c4c8693202"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
@@ -97,6 +113,9 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  input-imports = ["github.com/gin-gonic/gin"]
+  input-imports = [
+    "github.com/gin-gonic/gin",
+    "gopkg.in/olahol/melody.v1",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1
